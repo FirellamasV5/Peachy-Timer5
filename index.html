@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Incrementing Timer</title>
+    <script src="https://www.gstatic.com/firebasejs/11.3.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.3.1/firebase-database.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-image: url('./Untitled348_20250128201012.png');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            color: white;
+            transition: background 0.3s;
+        }
+        .container {
+            text-align: center;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 20px;
+            border-radius: 10px;
+        }
+        .title {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+        .clock {
+            font-size: 3rem;
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 1rem;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: 0.3s;
+            margin: 5px;
+        }
+        .reset-btn {
+            background: #ff4c4c;
+            color: white;
+        }
+        .reset-btn:hover {
+            background: #d43c3c;
+        }
+        .pause-btn {
+            background: #4c8cff;
+            color: white;
+        }
+        .pause-btn:hover {
+            background: #3b6bcc;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="title">Peachy Sighting</div>
+        <div class="clock" id="clock">00:00:00 - 00/00</div>
+        <button class="reset-btn" onclick="resetClock()">Reset</button>
+        <button class="pause-btn" onclick="togglePause()" id="pauseBtn">Pause</button>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-analytics.js";
+        import { getDatabase, ref, set, onValue, runTransaction } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCKQ2Q5-YGauNrHImCb1VSASoSHWyZJk2E",
+            authDomain: "peachytimer.firebaseapp.com",
+            databaseURL: "https://peachytimer-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "peachytimer",
+            storageBucket: "peachytimer.firebasestorage.app",
+            messagingSenderId: "675892522112",
+            appId: "1:675892522112:web:62885f9de812be706d4a65",
+            measurementId: "G-9X8X91FM8Q"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const analytics = getAnalytics(app);
+        const database = getDatabase(app);
+        const timerRef = ref(database, 'timer');
+        const pauseRef = ref(database, 'paused');
+
+        let elapsedSeconds = 0;
+        let startTime = Date.now();
+        let isPaused = false;
+        let interval;
+        const clockDisplay = document.getElementById("clock");
+        const pauseBtn = document.getElementById("pauseBtn");
+
+        function updateClock() {
+            if (isPaused) return;
+            const now = Date.now();
+            elapsedSeconds = Math.floor((now - startTime) / 1000);
+            displayTime(elapsedSeconds);
+
+            if (elapsedSeconds % 5 === 0) {
+                set(timerRef, elapsedSeconds);
+            }
+        }
+
+        function displayTime(seconds) {
+            const hours = Math.floor(seconds / 3600).toString().padStart(2, '0');
+            const minutes = Math.floor((seconds % 3600) / 60).toString().padStart(2, '0');
+            const sec = (seconds % 60).toString().padStart(2, '0');
+            const days = Math.floor(seconds / 86400).toString().padStart(2, '0');
+            const months = Math.floor(days / 30).toString().padStart(2, '0');
+            clockDisplay.textContent = `${hours}:${minutes}:${sec} - ${days}/${months}`;
+        }
+
+        onValue(timerRef, (snapshot) => {
+            if (snapshot.exists()) {
+                let firebaseSeconds = snapshot.val();
+                if (Math.abs(firebaseSeconds - elapsedSeconds) > 1) {
+                    elapsedSeconds = firebaseSeconds;
+                    startTime = Date.now() - elapsedSeconds * 1000;
+                    displayTime(elapsedSeconds);
+                }
+            }
+        });
+
+        onValue(pauseRef, (snapshot) => {
+            if (snapshot.exists()) {
+                isPaused = snapshot.val();
+                pauseBtn.textContent = isPaused ? "Resume" : "Pause";
+            }
+        });
+
+        function startClock() {
+            if (!interval) {
+                interval = setInterval(updateClock, 1000);
+            }
+        }
+
+        function togglePause() {
+            set(pauseRef, !isPaused);
+        }
+
+        function resetClock() {
+            runTransaction(timerRef, () => 0).then(() => {
+                elapsedSeconds = 0;
+                startTime = Date.now();
+                displayTime(elapsedSeconds);
+            });
+        }
+
+        window.resetClock = resetClock;
+        window.togglePause = togglePause;
+
+        startClock();
+    </script>
+</body>
+</html>
